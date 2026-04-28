@@ -1,9 +1,15 @@
+//Active interval state and chart instance
 let trafficChart = null;
 let activeInterval = 'hour';
 
+/**
+ * Sets the interval for the traffic chart.
+ * @param {string} interval - The selected interval: 'hour', 'day', 'week' or 'month'
+ */
 function setChartInterval(interval){
     activeInterval = interval;
 
+    // Update button active state to highlight the selected interval
     document.querySelectorAll('.interval-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.textContent.toLowerCase() == interval) {
@@ -13,6 +19,11 @@ function setChartInterval(interval){
     updateChart();
 }
 
+
+/**
+ * Initializes the traffic chart with Chart.js, setting up the datasets and styling.
+ * The chart is configured to display three datasets: Benign, flagged Flows, and Threat Intel.
+ */
 function initChart(){
     const ctx = document.getElementById('traffic-chart').getContext('2d');
 
@@ -67,12 +78,18 @@ function initChart(){
     });
 }
 
+
+/**
+ * Fetches traffic history data from the SQLite DB and updates the traffic chart.
+ * Updates the chart's labels and datasets based on the selected interval (hour, day, week, month).
+ */
 function updateChart(){
     fetch(`/api/traffic_history?interval=${activeInterval}`)
         .then(res => res.json())
         .then(data => {
             if (!trafficChart) return;
 
+            // Map the time strings as x-axis labels and each counter as a dataset
             trafficChart.data.labels = data.map(d => d.time);
             trafficChart.data.datasets[0].data = data.map(d => d.benign)
             trafficChart.data.datasets[1].data = data.map(d => d.alerts)
@@ -82,6 +99,9 @@ function updateChart(){
         .catch(err => console.error('Error fetching traffic history: ', err));
 }
 
+/**
+ * Fetches overall statistics from the SQLite DB and updates the elements in the dashboard.
+ */
 function updateStats(){
     fetch('/api/stats')
         .then(res => res.json())
@@ -94,6 +114,11 @@ function updateStats(){
         .catch(err => console.error('Error fetching stats: ', err));
 }
 
+/**
+ * Fetches the list of alerts from the SQLite DB and updates the alert list in the dashboard.
+ * If there are no alerts, it displays a message saying that no alerts have been detected yet.
+ * Each alert item is clickable, allowing the user to view more details in a modal.
+ */
 function updateAlerts() {
     fetch('/api/alerts')
         .then(res => res.json())
@@ -121,6 +146,10 @@ function updateAlerts() {
         .catch(err => console.error('Error fetching alerts:', err));
 }
 
+/**
+ * Displays the details of a selected alert in a modal.
+ * @param {Object} alert - The alert object of the selected alert.
+ */
 function showAlert(alert) {
     document.getElementById('modal-title').textContent = 
         alert.event_type === 'ALERT' ? 'ML Detection Alert' : 'Threat Intelligence Match';
@@ -156,27 +185,40 @@ function showAlert(alert) {
         </div>
     `;
 
+    //Show the modal and overlay
     document.getElementById('alert-modal').classList.remove('hidden');
     document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
+/**
+ * Closes the alert details modal and hides the overlay.
+ */
 function closeModal() {
     document.getElementById('alert-modal').classList.add('hidden');
     document.getElementById('modal-overlay').classList.add('hidden');
 }
 
+/**
+ * Opens the alert subscription settings modal.
+ */
 function openAlertSettings() {
     document.getElementById('alert-settings-modal').classList.remove('hidden');
     document.getElementById('settings-overlay').classList.remove('hidden');
     loadSubscriptions();
 }
  
+/**
+ * Closes the alert subscription settings modal and hides the overlay.
+ */
 function closeAlertSettings() {
     document.getElementById('alert-settings-modal').classList.add('hidden');
     document.getElementById('settings-overlay').classList.add('hidden');
     hideFeedback();
 }
  
+/**
+ * Fetches the list of subscribed phone numbers from the SQLite DB and updates the subscription list in the alert settings modal.
+ */
 function loadSubscriptions() {
     fetch('/api/subscriptions')
         .then(res => res.json())
@@ -196,6 +238,9 @@ function loadSubscriptions() {
         .catch(() => showFeedback('Failed to load subscriptions', 'error'));
 }
  
+/**
+ * Adds a new subscription for the specified phone number to the SQLite DB.
+ */
 function addSubscription() {
     const phone = document.getElementById('phone-input').value.trim();
     if (!phone) {
@@ -221,6 +266,10 @@ function addSubscription() {
     .catch(() => showFeedback('Failed to subscribe', 'error'));
 }
  
+/**
+ * Removes a subscription for the specified phone number from the SQLite DB.
+ * @param {string} phone - The phone number to be removed from the subscription list in the SQLite DB.
+ */
 function removeSubscription(phone) {
     fetch(`/api/subscriptions/${encodeURIComponent(phone)}`, { method: 'DELETE' })
         .then(res => res.json())
@@ -235,6 +284,11 @@ function removeSubscription(phone) {
         .catch(() => showFeedback('Failed to unsubscribe', 'error'));
 }
  
+/**
+ * Displays a feedback message to the user.
+ * @param {string} message - The feedback message to be displayed to the user.
+ * @param {string} type - The type of feedback, either 'success' or 'error', which determines the styling of the message.
+ */
 function showFeedback(message, type) {
     const el = document.getElementById('subscription-feedback');
     el.textContent = message;
@@ -242,15 +296,20 @@ function showFeedback(message, type) {
     setTimeout(hideFeedback, 3000);
 }
  
+/**
+ * Hides the feedback message after a short delay, allowing the user to see the message before it disappears.
+ */
 function hideFeedback() {
     const el = document.getElementById('subscription-feedback');
     el.classList.add('hidden');
 }
 
+// Initialize the dashboard by setting up the chart and loading initial data
 initChart();
 updateStats();
 updateChart();
 
+// Set up an interval to refresh the stats, chart, and alerts every 5 seconds to ensure the dashboard displays the most recent data.
 setInterval(() => {
     updateStats();
     updateChart();

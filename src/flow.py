@@ -9,6 +9,9 @@ class Flow:
       timestamps, and state."""
     
     def __init__(self, packet, timestamp):
+
+        """Initializes a flow with the first packet, setting identifiers and timestamps."""
+
         #Flow identifiers
         self.src_ip = packet[0]
         self.dst_ip = packet[1]
@@ -31,13 +34,14 @@ class Flow:
         """Adds a packet to the flow, updating packet lists, timestamps, and state.
           If TCP flags indicate FIN/RST, marks the flow as completed."""
         
-        if self.packets:
+        # if self.packets:
 
-            last = self.packets[-1]
-            time_diff = abs((timestamp - last['timestamp']).total_seconds())
+        #     #Check for duplicate packets (same size, flags, and timestamp within 1ms) to avoid inflating packet counts due to duplicates in capture
+        #     last = self.packets[-1]
+        #     time_diff = abs((timestamp - last['timestamp']).total_seconds())
 
-            if time_diff < 0.001 and size == last['size'] and str(flags) == str(last['flags']):
-                return
+        #     if time_diff < 0.001 and size == last['size'] and str(flags) == str(last['flags']):
+        #         return
 
 
         self.packets.append({
@@ -77,7 +81,8 @@ class Flow:
             else:
                 timeout = 120
 
-        if self.dst_port == 80 and len(self.packets) > 2:
+        #Slowloris attack heuristic: If it's an HTTP flow with very low packet rate over a long duration
+        if self.dst_port == 80 or self.src_port == 80 and len(self.packets) > 2:
             duration_seconds = (current_time - self.start_time).total_seconds()
             packets_per_second = len(self.packets) / duration_seconds if duration_seconds > 0 else 0
             if packets_per_second < 1.0 and duration_seconds > 30:
@@ -116,6 +121,7 @@ class FlowManager:
         if flags:
             fin_rst = 'F' in str(flags) or 'R' in str(flags)
 
+        #If FIN/RST is seen but the flow doesn't exist, ignore the packet since it may be an orphaned FIN/RST without a corresponding flow
         if fin_rst and key not in self.flows:
             return None
         
@@ -136,7 +142,7 @@ class FlowManager:
 
         flow.add_packet(size, timestamp, direction, flags, window, payload_size, header_size)
 
-        #Complete flopw if FIN/RST flags are seen in TCP packets
+        #Complete flow if FIN/RST flags are seen in TCP packets
         if fin_rst:
             self.completed_flows.append(flow)
             del self.flows[key]
@@ -159,11 +165,3 @@ class FlowManager:
 
         self.completed_flows.extend(expired)
         return expired
-    
-    def get_completed_flows(self):
-
-        """Returns and clears the list of completed flows"""
-
-        flows = self.completed_flows.copy()
-        self.completed_flows.clear()
-        return flows

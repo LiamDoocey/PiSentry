@@ -12,7 +12,7 @@ from dashboard import add_traffic_event, start_dashboard, set_alert_manager
 import threading 
 import time
 import argparse
-import subprocess
+import socket
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,9 +20,10 @@ load_dotenv()
 #Init managers
 flow_manager = FlowManager()
 predictor = Predictor()
-alert_manager = None
+alert_manager = None # Set at startup via command line args after AlertManager is initialized
 threat_intel = ThreatIntel()
 
+#Color codes for terminal output
 RED = '\033[91m'
 RESET = '\033[0m'
 
@@ -37,6 +38,7 @@ def packet_callback(packet):
         protocol = packet[IP].proto
         size = len(packet)
 
+        #Filter out multicast, broadcast, and link-local traffic which is generally not relevant.
         if(dst_ip.startswith('239.')or 
             dst_ip.startswith('234.')or
             dst_ip.startswith('169.254.') or
@@ -65,9 +67,9 @@ def packet_callback(packet):
 
             #If the flow is completed, extract features
             if completed:
+                #Heuristic: If it's a server response flow, mark as benign without ML prediction since it's likely a response to a client request and less likely to be malicious.
                 if completed.src_port < 1024:
                     add_traffic_event('OK', 'BENIGN', completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP', 100.0)
-
                 else:
                     features = extract_features(completed, completed.dst_port)
 
@@ -91,7 +93,7 @@ def packet_callback(packet):
                     label, confidence = predictor.predict(features)
                 
                     #Layer 2: Use ML prediction to detect novel or unknown attacks based on flow features. 
-                    # This allows us to catch emerging threats that may not be in threat intelligence databases yet.
+                    # This allows us to catch threats from sources that may not be in the threat intelligence databases yet.
                     if predictor.is_attack(label):
                         print(f"{RED}[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                         print(f"Flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port} | Protocol: TCP | Size: {size} bytes{RESET}")
@@ -102,6 +104,7 @@ def packet_callback(packet):
                         if alerted:
                             add_traffic_event('ALERT', label, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP', confidence)
                         else:
+                            # If the alert was suppressed due to rate limiting, we can still log it in the dashboard with a special label to indicate it was detected but not alerted.
                             add_traffic_event('ALERT_SUPPRESSED', label, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP', confidence)
                     else:
                         print(f"[OK] Benign flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port}")
@@ -130,6 +133,7 @@ def expire_flows_periodically():
                 
                 proto = 'UDP' if flow.protocol == 17 else 'TCP'
             
+                #Heuristic: If it's a server response flow, mark as benign without ML prediction since it's likely a response to a client request and less likely to be malicious.
                 if flow.dst_port >= 1024 and flow.src_port < 1024:
                     print(f"[OK] Server response flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
                     add_traffic_event('OK', 'BENIGN', flow.src_ip, flow.dst_ip,
@@ -174,34 +178,38 @@ def start_monitor(interface = None):
     """Starts the network monitor by initializing the flow manager, starting the expiry thread, and beginning packet capture on the default
     interface if none is specified."""
 
-    result = subprocess.run(['cat', '/sys/class/net/eth0/address'], capture_output = True, text = True)
-    nids_mac = result.stdout.strip()
-
     print("Starting network monitor...")
 
+    #Start thread to periodically check for expired flows and extract features from them.
     expiry_thread = threading.Thread(
         target = expire_flows_periodically,
         daemon = True
     )
     expiry_thread.start()
 
+    #Get the IP address of the machine running the NIDS to filter out its own traffic from the capture, which can reduce noise and improve performance.
+    nids_ip = socket.gethostbyname(socket.gethostname())
+
     #Start sniffing packets. prn calls packet_callback for each captured packet.
     sniff(
         iface =  interface,
         prn = packet_callback,
         store = False,
-        filter = f"ether dst {nids_mac} and not dst host 192.168.100.10"
+        filter = f"not dst host {nids_ip}"
     )
 
 if __name__ == "__main__":
+    #Parse command line arguments for interface selection and test mode, which allows running the monitor without sending actual alerts for testing and development.
     parser = argparse.ArgumentParser()
     parser.add_argument('--iface', type = str, help = 'Choose what interface to listen on', default = None)
     parser.add_argument('--test', action = 'store_true', help = 'Run in test mode - Alerts wont be actually be sent')
     args = parser.parse_args()
 
+    #Initialize the alert manager and set it for use in the dashboard and monitor.
     alert_manager = AlertManager(test_mode = args.test)
     set_alert_manager(alert_manager)
 
+    #Start the dashboard in a separate thread so it can run concurrently with the packet capture and flow monitoring.
     dashboard_thread = threading.Thread(
         target = start_dashboard,
         daemon = True

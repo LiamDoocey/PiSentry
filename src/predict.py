@@ -1,5 +1,5 @@
 """Loads the trained model and label encoder, and provides a method to predict the label of a flow based on its features
-along with the confidence of the prediction."""
+along with the confidence of the prediction, prints SHAP values to explain its decision."""
 
 import joblib
 import numpy as np
@@ -24,16 +24,24 @@ class Predictor:
         self.encoder = joblib.load(encoder_path)
         print("Model and label encoder loaded successfully.")
 
+        #Init SHAP explainer, used to explain model prediction 
         self.explainer = shap.TreeExplainer(self.model)
+
+        #Get feature names from the model for dataframe construction
         self.feature_names = self.model.feature_names_in_
 
     def explain(self, features, predicted_label):
+
+        """Prints SHAP values to explain the model's prediction for a given set of features and the predicted label."""
+
         features_array = np.array(features).reshape(1, -1)
         shap_values = self.explainer.shap_values(features_array)
 
+        #Extract SHAP values for the specific predicted class
         class_idx = list(self.encoder.classes_).index(predicted_label)
         feature_shap = shap_values[0, :, class_idx]
 
+        #Sort features by SHAP value to show most influential at top
         contributions = sorted(
             zip(self.feature_names, features, feature_shap),
             key = lambda x: abs(x[2]),
@@ -48,9 +56,17 @@ class Predictor:
 
     def predict(self, features):
 
-        """Predicts the label of a flow based on its features using the loaded model."""
+        """
+            Predicts the label of a flow based on its features using the loaded model.
+        
+            Custom Threshold Logic:
+            - If BENIGN probability >= 50%: classify as BENIGN
+            - If BENIGN probability < 50% and the top attack class > 50%: classify as that attack
+            - If BENIGN probability < 50% but no attack class exceeds 50%: default to BENIGN since the model is not confident enough in any specific attack type
+        """
 
         try:
+            #Convert features to numpy array and handle any NaN or infinite values by replacing them with 0, then reshape for model input
             features_array = np.nan_to_num(
                 np.array(features, dtype = float),
                 nan = 0.0,
@@ -58,9 +74,8 @@ class Predictor:
                 neginf = 0.0
             ).reshape(1, -1)
 
-            #Get feature names from model
-            features_names = self.model.feature_names_in_
-            features_df = pd.DataFrame(features_array, columns = features_names)
+            #Get feature names from model and wrap in dataframe
+            features_df = pd.DataFrame(features_array, columns = self.feature_names)
 
 
             start = time.perf_counter()
@@ -68,7 +83,8 @@ class Predictor:
             prediction_time = (time.perf_counter() - start) * 1000
 
             classes = self.encoder.classes_
-            #Detection threshold
+            # ----- Custom Detection Threshold -----
+            #Get the BENIGN probability and the highest attack probability overall
             benign_idx = list(classes).index('BENIGN')
             benign_prob = probabilitity[benign_idx]
 
@@ -76,6 +92,7 @@ class Predictor:
             label = classes[max_idx]
             confidence = probabilitity[max_idx] * 100
 
+            #If BENIGN < 50% confidence, check other class confidence
             if benign_prob < 0.50:
                 attack_probs = [(classes[i], probabilitity[i])
                                 for i in range (len(classes))
@@ -85,8 +102,10 @@ class Predictor:
                 top_attack = attack_probs[0]
 
                 if top_attack[1] > 0.50:
+                    #If the model is more than 50% confident in an attack class, return that instead of BENIGN
                     return top_attack[0], top_attack[1] * 100
                 else:
+                    #If the model is not at least 50% confident in any attack class, default to BENIGN
                     return 'BENIGN', benign_prob * 100 #Return as benign if model is not at least 50% confident in its attack type
 
             return label, confidence

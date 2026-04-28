@@ -4,11 +4,17 @@ from datetime import datetime
 DB_PATH = 'nids.db'
 
 def get_connection():
+
+    """creates and returns SQLite database connection"""
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
+
+    """initialises the database with necessary tables"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -81,6 +87,9 @@ def init_db():
     print("Database initialised.")
 
 def log_traffic_event(event_type):
+
+    """logs a traffic event to the database, updating both traffic history and lifetime stats"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -125,6 +134,9 @@ def log_traffic_event(event_type):
     conn.close()
 
 def log_alert(event_type, label, src_ip, dst_ip, src_port, dst_port, protocol, confidence):
+
+    """logs an alert to the database"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -140,6 +152,9 @@ def log_alert(event_type, label, src_ip, dst_ip, src_port, dst_port, protocol, c
     conn.close()
 
 def get_stats():
+
+    """retrieves lifetime stats from the database"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -150,6 +165,9 @@ def get_stats():
     return dict(row) if row else {}
 
 def get_traffic_history(cutoff):
+
+    """retrieves traffic history from the database since the specified cutoff time"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -160,6 +178,9 @@ def get_traffic_history(cutoff):
     return [dict(row) for row in rows]
 
 def get_alert_history(limit = 100):
+
+    """retrieves the alert history from the database"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -171,6 +192,9 @@ def get_alert_history(limit = 100):
     return [dict(row) for row in rows]
 
 def set_cooldown(src_ip, label):
+
+    """sets a cooldown for a specific source IP and alert label"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -182,6 +206,9 @@ def set_cooldown(src_ip, label):
     conn.close()
 
 def get_cooldown(src_ip, label):
+
+    """retrieves the cooldown timestamp for a specific source IP and alert label, if it exists"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -192,6 +219,9 @@ def get_cooldown(src_ip, label):
     return datetime.fromisoformat(row['timestamp']) if row else None
 
 def save_subscription(phone_number, subscription_arn):
+
+    """saves or updates an alert subscription in the database"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -201,6 +231,9 @@ def save_subscription(phone_number, subscription_arn):
     conn.close()
 
 def delete_subscription(phone_number):
+
+    """deletes an alert subscription from the database"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -210,6 +243,9 @@ def delete_subscription(phone_number):
     conn.close()
 
 def get_all_subscriptions():
+
+    """retrieves all alert subscriptions from the database"""
+
     conn = get_connection()
     cursor = conn.cursor()
 

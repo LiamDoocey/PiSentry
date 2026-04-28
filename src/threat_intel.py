@@ -20,6 +20,7 @@ class ThreatIntel:
         self.cache_hours = cache_hours
         self.cache = self._load_cache()
 
+        # RFC 1918 private address ranges and special addresses that should never be checked against the threat intelligence API
         self.private_ip_ranges = [
             '192.168.','10.','172.16.', '172.17.',
             '172.18.', '172.19.', '172.20.', '172.21.',
@@ -67,9 +68,11 @@ class ThreatIntel:
         """Checks an IP address against the AbuseIPDB API and returns a result indicating if it's malicious along with additional info.
         Results are cached to avoid redundant API calls for the same IP within the cache expiration time. Private IPs are skipped."""
 
+        #Skips private IPs
         if self._is_private_ip(ip):
             return None
         
+        #Return cached result if IP is in cache and still valid
         if self._is_cache_valid(ip):
             return self.cache[ip]['result']
         
@@ -82,7 +85,7 @@ class ThreatIntel:
                 },
                 params = {
                     'ipAddress': ip,
-                    'maxAgeInDays': 90
+                    'maxAgeInDays': 90 #Only consider reports from the last 90 days to ensure relevance
                 }
             )
 
@@ -97,6 +100,7 @@ class ThreatIntel:
                     'isp': data.get('isp', 'Unknown'),
                 }
 
+                #Store result in cache with timestamp
                 self.cache[ip] = {
                     'timestamp': datetime.now().isoformat(),
                     'result': result

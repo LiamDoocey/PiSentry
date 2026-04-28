@@ -11,14 +11,14 @@ load_dotenv()
 class AlertManager:
 
     """Manages AWS SNS subscriptions and sends alerts when malicious flows are detected by the NIDS.
-    Subscriptions are stored in a local JSON file to persist across sessions."""
+    Subscriptions are stored in a SQLite database to persist across sessions."""
 
     def __init__(self, region = 'eu-west-1', test_mode = False):
 
-        """Initializes the AlertManager by setting up the SNS client and loading existing subscriptions from disk."""
+        """Initializes the AlertManager by setting up the SNS client and loading existing subscriptions from database."""
 
+        #If test_mode = true - AlertManager will only print to console instead of sending actual SMS alerts
         self.test_mode = test_mode
-
         if test_mode:
             print("Running in test mode - Actual SMS alerts will not be sent.")
 
@@ -35,18 +35,20 @@ class AlertManager:
         if not self.topic_arn:
             raise ValueError("SNS_TOPIC_ARN environment variable not set.")
 
-        #Store 5 minutes alert cooldown cahce to stop alert spam.
+        #Store 5 minutes alert cooldown cache to stop alert spam.
         self._cooldowns = {}
         self.cooldown_seconds = 300
+
+        #Forces threads to wait for each other when accessing cooldown cache to prevent duplicate alerts
         self._lock = threading.Lock()
     
-    def _should_alert(self, label, src_ip, dst_ip, dst_port):
+    def _should_alert(self, label, src_ip):
 
-        attacker_ip = src_ip if dst_port is not None and dst_port < 1024 else dst_ip
-        
+        """Checks if an alert should be sent or not if it still in its cooldown period."""
+
         with self._lock:
 
-            last = get_cooldown(attacker_ip, label)
+            last = get_cooldown(src_ip, label)
 
             if last:
                 elapsed_time = (datetime.now() - last).total_seconds()
@@ -54,10 +56,10 @@ class AlertManager:
                 if elapsed_time < self.cooldown_seconds:
                     remaining = self.cooldown_seconds - elapsed_time
 
-                    print (f"[ALERT COOLDOWN] Duplicate alert detected: {label} from {attacker_ip} | {remaining:.0f}s remaining on alert cooldown.")
+                    print (f"[ALERT COOLDOWN] Duplicate alert detected: {label} from {src_ip} | {remaining:.0f}s remaining on alert cooldown.")
                     return False
             
-            set_cooldown(attacker_ip, label)
+            set_cooldown(src_ip, label)
             return True
 
     def subscribe(self, phone_number):
@@ -117,7 +119,7 @@ class AlertManager:
 
         """Sends an alert via SNS with the details of the detected attack. Returns True if successful, False otherwise."""
 
-        if not self._should_alert(label, src_ip, dst_ip, dst_port):
+        if not self._should_alert(label, src_ip):
             return False
         
         if self.test_mode:
