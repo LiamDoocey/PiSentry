@@ -89,11 +89,84 @@ function updateChart(){
         .then(data => {
             if (!trafficChart) return;
 
-            // Map the time strings as x-axis labels and each counter as a dataset
-            trafficChart.data.labels = data.map(d => d.time);
-            trafficChart.data.datasets[0].data = data.map(d => d.benign)
-            trafficChart.data.datasets[1].data = data.map(d => d.alerts)
-            trafficChart.data.datasets[2].data = data.map(d => d.threats)
+            let labels, benign, alerts, threats;
+
+            if (activeInterval === 'hour') {
+                //Hour interval - pulls data from SQLite database
+                labels = data.map(d => d.time);
+                benign = data.map(d => d.benign);
+                alerts = data.map(d => d.alerts);
+                threats = data.map(d => d.threats);
+
+            } else if (activeInterval === 'day') {
+                //Day interval - group by hour across the day 00:00 -> 23:59
+                //Inits all hours so hours with no data still appear on the chart
+                const hours = {};
+                for (let h = 0; h < 24; h++) {
+                    const key = String(h).padStart(2, '0') + ':00';
+                    hours[key] = { benign: 0, alerts: 0, threats: 0, count: 0 };
+                }
+                data.forEach(d => {
+                    const hour = d.time.substring(0, 2) + ':00';
+                    if (hours[hour]) {
+                        hours[hour].benign += d.benign;
+                        hours[hour].alerts += d.alerts;
+                        hours[hour].threats += d.threats;
+                        hours[hour].count++;
+                    }
+                });
+                labels = Object.keys(hours);
+                benign = labels.map(h => hours[h].benign);
+                alerts = labels.map(h => hours[h].alerts);
+                threats = labels.map(h => hours[h].threats);
+
+            } else if (activeInterval === 'week') {
+                // Average by day of week - 7 points on X-axis
+                //Inits all days so days with no data still appear on the chart
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const buckets = {};
+                days.forEach(d => buckets[d] = { benign: 0, alerts: 0, threats: 0, count: 0 });
+
+                data.forEach(d => {
+                    const dayIdx = new Date(d.timestamp).getDay();
+                    const dayName = days[(dayIdx + 6) % 7];
+                    buckets[dayName].benign += d.benign;
+                    buckets[dayName].alerts += d.alerts;
+                    buckets[dayName].threats += d.threats;
+                    buckets[dayName].count++;
+                });
+
+                labels = days;
+                benign = days.map(d => buckets[d].benign);
+                alerts = days.map(d => buckets[d].alerts);
+                threats = days.map(d => buckets[d].threats);
+
+            } else if (activeInterval === 'month') {
+                // Average by month - 12 points on X-axis
+                //Inits all months so months with no data still appear on the chart
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const buckets = {};
+                months.forEach(m => buckets[m] = { benign: 0, alerts: 0, threats: 0, count: 0 });
+
+                data.forEach(d => {
+                    const month = months[new Date(d.timestamp).getMonth()];
+                    buckets[month].benign += d.benign;
+                    buckets[month].alerts += d.alerts;
+                    buckets[month].threats += d.threats;
+                    buckets[month].count++;
+                });
+
+                labels = months;
+                benign = months.map(m => buckets[m].benign);
+                alerts = months.map(m => buckets[m].alerts);
+                threats = months.map(m => buckets[m].threats);
+            }
+
+            trafficChart.data.labels = labels;
+            trafficChart.data.datasets[0].data = benign;
+            trafficChart.data.datasets[1].data = alerts;
+            trafficChart.data.datasets[2].data = threats;
             trafficChart.update();
         })
         .catch(err => console.error('Error fetching traffic history: ', err));
