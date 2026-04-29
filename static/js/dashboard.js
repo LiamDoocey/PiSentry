@@ -320,6 +320,12 @@ function addSubscription() {
         showFeedback('Please enter a phone number', 'error');
         return;
     }
+
+    const phoneRegex = /^\+[1-9]\d{7,14}$/;
+    if (!phoneRegex.test(phone)) {
+        showFeedback('Please enter a valid international number e.g. +353831234567', 'error');
+        return;
+    }
  
     fetch('/api/subscriptions', {
         method: 'POST',
