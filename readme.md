@@ -228,7 +228,7 @@ The model was trained on CIC-IDS-2017 which was generated on professional 10Gbps
 ## Project Structure
 
 ```
-PiGuard/
+PiSentry/
 ├── src/
 │   ├── monitor.py          # Entry point — packet capture and pipeline
 │   ├── flow.py             # TCP/UDP flow aggregation
