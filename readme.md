@@ -1,7 +1,6 @@
 # PiSentry - ML-Powered Network Intrusion Detection System
 
 > Real-time network intrusion detection on a Raspberry Pi 5, combining a Random Forest classifier with AbuseIPDB threat intelligence to detect and classify attacks across 13 attack vectors.
-<img width="2438" height="1463" alt="Network_top" src="https://github.com/user-attachments/assets/41c2d6ab-a4c2-4791-9e12-94fdccd76186" />
 
 ---
 
@@ -42,6 +41,12 @@
 The TP-Link TL-SG105E managed switch mirrors all traffic from ports 2 and 3 to port 1 where the NIDS listens passively. The NIDS is never in the traffic path.
 
 ---
+
+## Two-Layer Detection
+
+<img width="750" alt="image" src="https://github.com/user-attachments/assets/6553c2b0-55da-478d-8eb2-259e816ceb84" />
+
+The system used a two-layer detection pipeline, leverageing the power of the AbuseIP Database it can check IPs for reports in the last 90 days.
 
 ## Installation
 
