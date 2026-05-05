@@ -1,8 +1,7 @@
-# PiSentry — ML-Powered Network Intrusion Detection System
+# PiSentry - ML-Powered Network Intrusion Detection System
 
 > Real-time network intrusion detection on a Raspberry Pi 5, combining a Random Forest classifier with AbuseIPDB threat intelligence to detect and classify attacks across 13 attack vectors.
-
-![Dashboard Screenshot](screenshots/dashboard.png)
+<img width="2438" height="1463" alt="Network_top" src="https://github.com/user-attachments/assets/41c2d6ab-a4c2-4791-9e12-94fdccd76186" />
 
 ---
 
@@ -36,8 +35,9 @@
 
 ## Network Setup
 
- Network topology image
-```
+ <img width="2438" height="1463" alt="Network_top" src="https://github.com/user-attachments/assets/93fab2d0-987f-4f74-b973-438ed68da032" />
+
+---
 
 The TP-Link TL-SG105E managed switch mirrors all traffic from ports 2 and 3 to port 1 where the NIDS listens passively. The NIDS is never in the traffic path.
 
@@ -123,7 +123,7 @@ sudo venv/bin/python src/monitor.py --iface eth0 --test
 The dashboard will be available at:
 
 ```
-http://192.168.xxx.xxx:5000
+http://192.168.xxx.xxx:5000 (NIDS Address)
 ```
 
 Accessible from any device on the same network.
@@ -135,22 +135,22 @@ Accessible from any device on the same network.
 ### Main Dashboard
 Displays lifetime stat cards, real-time traffic volume chart and alert history. The chart supports day, week and month intervals.
 
-![Main Dashboard](screenshots/dashboard.png)
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/d6eb39dc-c4f9-4bcd-ac69-550b832fa131" />
 
 ### Alert Modal
 Click any alert to view full flow details including source/destination IP, port, protocol, attack classification and model confidence.
 
-![Alert Modal](screenshots/alert_modal.png)
+<img width="911" height="491" alt="image" src="https://github.com/user-attachments/assets/6b6b5c17-a88f-4545-a27d-744f9e42820b" />
 
 ### SMS Subscriber Management
 Add and remove SMS subscribers directly from the dashboard without accessing the AWS console.
 
-![SMS Management](screenshots/sms_modal.png)
+<img width="767" height="313" alt="image" src="https://github.com/user-attachments/assets/dc5bd766-7253-4298-8fae-79edd7c88762" />
 
 ### Terminal Output
 Every alert prints the SHAP explanation alongside the prediction time directly to the terminal.
 
-![Terminal Output](screenshots/terminal.png)
+<img width="810" height="400" alt="image" src="https://github.com/user-attachments/assets/042eea00-4c39-4e14-9dec-a89c71f9e3ec" />
 
 ---
 
